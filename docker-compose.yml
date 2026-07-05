@@ -1,0 +1,83 @@
+version: "3.9"
+
+# SentinelCore ELK Stack
+# Runs Elasticsearch + Kibana + SentinelCore forwarder as services
+#
+# Usage:
+#   docker-compose up -d           # start all services
+#   docker-compose logs -f         # follow logs
+#   docker-compose down            # stop all services
+#
+# After startup:
+#   Elasticsearch → http://localhost:9200
+#   Kibana        → http://localhost:5601
+
+services:
+
+  # ── Elasticsearch ────────────────────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.0
+    container_name: sentinelcore-es
+    environment:
+      - discovery.type=single-node
+      - cluster.name=sentinelcore-lab
+      - node.name=es-node-1
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9200/_cluster/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Kibana ───────────────────────────────────────────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.19.0
+    container_name: sentinelcore-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=sentinelcore-kibana
+      - SERVER_HOST=0.0.0.0
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5601/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ── SentinelCore Forwarder ───────────────────────────────────────────────
+  # Runs continuous sync every 30s from SentinelCore SQLite → Elasticsearch
+  forwarder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentinelcore-forwarder
+    environment:
+      - ES_HOST=http://elasticsearch:9200
+      - SENTINELCORE_DB=/data/sentinelcore.db
+    volumes:
+      # Mount SentinelCore DB (read-only)
+      - ${SENTINELCORE_DB_PATH:-../sentinelcore/logs/sentinelcore.db}:/data/sentinelcore.db:ro
+      # Persist sync state
+      - forwarder_state:/app/state
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    command: ["python3", "sync.py", "--interval", "30"]
+    restart: unless-stopped
+
+volumes:
+  es_data:
+  forwarder_state:
