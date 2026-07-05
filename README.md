@@ -28,9 +28,37 @@ Fourth project in a cybersecurity portfolio: **NetWatch → HomeGuard → Sentin
 ---
 
 ## Architecture
-SentinelCore (SQLite)
-├── events table     →  forwarder.py  →  sentinelcore-events  →  Kibana
-└── alerts table     →  forwarder.py  →  sentinelcore-alerts  →  Kibana
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     SentinelCore (SQLite)                   │
+│                                                             │
+│   events table  ──────────────────────────────────────┐    │
+│   alerts table  ──────────────────────────────────┐   │    │
+└───────────────────────────────────────────────────│───│────┘
+                                                    │   │
+                                                    ▼   ▼
+                                ┌───────────────────────────┐
+                                │       forwarder.py        │
+                                │    (sync.py continuous)   │
+                                └──────────┬────────────────┘
+                                           │
+                          ┌────────────────▼────────────────┐
+                          │         Elasticsearch 8.x       │
+                          │  sentinelcore-events (208 docs) │
+                          │  sentinelcore-alerts  (9 docs)  │
+                          └────────────────┬────────────────┘
+                                           │
+                          ┌────────────────▼────────────────┐
+                          │            Kibana 8.x           │
+                          │  • Eventos por Fuente (pie)     │
+                          │  • Eventos por Tipo (bar)       │
+                          │  • Top IPs (table)              │
+                          │  • Alertas por Severidad (pie)  │
+                          │  • 4 Alerting rules             │
+                          └─────────────────────────────────┘
+```
+
 ---
 
 ## Setup
@@ -146,10 +174,10 @@ This project is the observability layer for [SentinelCore](https://github.com/jr
 - [x] Python forwarder (events + alerts)
 - [x] Automatic index creation with field mappings
 - [x] 4 Kibana security dashboards
-- [ ] Kibana dashboard export (`.ndjson`) for one-click import
-- [ ] Continuous sync mode (poll every N seconds)
-- [ ] Kibana alerting rules mapped to SentinelCore correlation rules
-- [ ] Docker Compose with Elasticsearch + Kibana + forwarder
+- [x] Kibana dashboard export (`.ndjson`) for one-click import
+- [x] Continuous sync mode (poll every N seconds)
+- [x] Kibana alerting rules mapped to SentinelCore correlation rules
+- [x] Docker Compose with Elasticsearch + Kibana + forwarder
 
 ---
 
